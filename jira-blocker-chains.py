@@ -19,23 +19,6 @@ PROJECT_KEY = os.getenv("PROJECT_KEY")
 DEFAULT_DOT_SIZE = 1500
 DOT_SCALING_AMOUNT = 1000
 
-# applies the legend matching parent / epic names to dot colors
-def apply_legend(lengend_colors, legend_labels, title):
-    handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in lengend_colors.values()]
-    labels = [f"{legend_labels.get(key, key)} ({key})" for key in lengend_colors]
-    if len(handles) > 0:
-        plt.legend(handles, labels, title=title)
-
-# #########################################################################################
-# plots the dots on the graph.
-#
-# currently using the kamada_kawai_layout algorithm, but spring_layout could also work
-# #########################################################################################
-def graph_issues(chain_graph, chain_issue_keys, chain_node_colors, node_sizes):
-    pos = nx.kamada_kawai_layout(chain_graph)
-    nx.draw(chain_graph, pos, with_labels=True, labels=chain_issue_keys, node_color=chain_node_colors, node_size=node_sizes, font_size=8, font_color="black", arrowsize=20)
-    plt.title(f"Jira Blocker Chains - Sprint {SPRINT_NUMBER}")
-
 # fetches the issues from Jira
 def fetch_issues(headers):
     jql = f'project = {PROJECT_KEY} AND sprint = {SPRINT_NUMBER} AND Team[Team] = {TEAM_GUID}'
@@ -45,10 +28,12 @@ def fetch_issues(headers):
     response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
     data = response.json()
     return data.get("issues", [])
-
+    
 # finds the issues that are blocked or are blocking - we can ignore the rest
-def get_issues_in_blocker_chains(graph, issues, node_sizes):
+def get_blocker_chains(issues): 
+    graph = nx.DiGraph()
     issues_in_chains = set()
+    node_sizes = {} #add node_sizes
 
     for issue in issues:
         key = issue["key"]
@@ -64,7 +49,7 @@ def get_issues_in_blocker_chains(graph, issues, node_sizes):
                         if key in node_sizes:
                             node_sizes[key]+= DOT_SCALING_AMOUNT
 
-    return issues_in_chains
+    return graph, issues_in_chains, node_sizes
 
 # #########################################################
 # gets the name of the parents for each ticket
@@ -75,7 +60,7 @@ def get_parent_data(chain_graph, issues, headers):
     parent_names = {}
     chain_node_colors = []
     parent_colors = {}
-    color_cycle = plt.cm.get_cmap("tab20", 20).colors
+    color_cycle = plt.cm.get_cmap("Set3", chain_graph.number_of_nodes()).colors
 
      # Fetch parent info only for issues in blocker chains
     for node in chain_graph.nodes:
@@ -84,48 +69,47 @@ def get_parent_data(chain_graph, issues, headers):
             if parent_id not in parent_colors:
                 parent_colors[parent_id] = color_cycle[len(parent_colors) % 20]
                 parent_issue_url = f"{JIRA_BASE_URL}/rest/api/2/issue/{parent_id}"
-                parent_response = requests.get(parent_issue_url, headers=headers)
-                parent_response.raise_for_status()
-                parent_data = parent_response.json()
-                parent_names[parent_id] = parent_data["fields"]["summary"]
+
+                try:
+                    parent_response = requests.get(parent_issue_url, headers=headers)
+                    parent_response.raise_for_status()
+                    parent_data = parent_response.json()
+                    parent_names[parent_id] = parent_data["fields"]["summary"]
+                except requests.exceptions.RequestException as e:
+                    print(f"Error fetching parent issue {parent_id}: {e}")
+                    parent_names[parent_id] = f"Error: {parent_id}"
             chain_node_colors.append(parent_colors[parent_id])
         else:
             chain_node_colors.append("lightgray")
 
     return parent_names, chain_node_colors, parent_colors
 
-def get_issue_keys(issues):
-    issue_keys = {}  # Store issue keys and their summaries
-    for issue in issues:
-        key = issue["key"]
-        issue_keys[key] = key
-    return issue_keys
-
-def visualize_jira_blockers(headers, issues):    
-    graph = nx.DiGraph()
-    node_sizes = {} #add node_sizes
-
-    issue_keys = get_issue_keys(issues)
-    issues_in_chains = get_issues_in_blocker_chains(graph, issues, node_sizes)
+def visualize_blocker_chains(headers, issues):   
+    graph, issues_in_chains, node_sizes = get_blocker_chains(issues)
 
     chain_graph = graph.subgraph(issues_in_chains)
-    chain_issue_keys = {k: issue_keys[k] for k in issues_in_chains}
+    chain_issue_keys = {k: k for k in issues_in_chains}
     chain_node_sizes = [node_sizes[node] for node in chain_graph.nodes()] #get list of node sizes
 
     parent_names, chain_node_colors, parent_colors = get_parent_data(chain_graph, issues, headers)
 
     if chain_graph.number_of_nodes() > 0:
         # Create the graph
-        graph_issues(chain_graph, chain_issue_keys, chain_node_colors, chain_node_sizes)
+        pos = nx.kamada_kawai_layout(chain_graph)
+        nx.draw(chain_graph, pos, with_labels=True, labels=chain_issue_keys, node_color=chain_node_colors, node_size=chain_node_sizes, font_size=8, font_color="black", arrowsize=20)
+        plt.title(f"Jira Blocker Chains - Sprint {SPRINT_NUMBER}")
 
         # Create the legend
-        apply_legend(parent_colors, parent_names, "Parent Issues")
+        handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in parent_colors.values()]
+        labels = [f"{parent_names.get(key, key)} ({key})" for key in parent_colors]
+        if len(handles) > 0:
+            plt.legend(handles, labels, title="Parent Issues")
 
         plt.show()
     else:
         print("No blocker chains found in the specified sprint.")
 
-def run():
+def main():
     try:
         headers = {
             "Accept": "application/json",
@@ -134,7 +118,7 @@ def run():
         }
 
         issues = fetch_issues(headers)
-        visualize_jira_blockers(headers, issues)
+        visualize_blocker_chains(headers, issues)
     except requests.exceptions.RequestException as e:
         print(f"Error fetching Jira data: {e}")
     except json.JSONDecodeError as e:
@@ -142,6 +126,6 @@ def run():
     except KeyError as e:
         print(f"Error accessing Jira data: {e}")
 
-
-run()
-print('Done')
+if __name__ == "__main__":
+    main()
+    print('Done')
