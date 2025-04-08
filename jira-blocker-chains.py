@@ -19,9 +19,9 @@ PROJECT_KEY = os.getenv("PROJECT_KEY")
 DEFAULT_DOT_SIZE = 1500
 DOT_SCALING_AMOUNT = 1000
 
-COLOR_PALETTE = "tab20"
-# COLOR_PALETTE = "Set3"
 # COLOR_PALETTE = "Pastel1"
+# COLOR_PALETTE = "Set3"
+COLOR_PALETTE = "Set2"
 
 # PLOTTING_ALGORITHM = "kamada-kawai"
 PLOTTING_ALGORITHM = "spring"
@@ -77,7 +77,7 @@ def get_parent_data(chain_graph, issues, headers):
         parent_id = next((i["fields"].get("parent", {}).get("key") for i in issues if i["key"] == node), None)
         if parent_id:
             if parent_id not in parent_colors:
-                parent_colors[parent_id] = color_cycle[len(parent_colors) % 20]
+                parent_colors[parent_id] = color_cycle[(len(parent_colors) * 3) % 100]
                 parent_issue_url = f"{JIRA_BASE_URL}/rest/api/2/issue/{parent_id}"
 
                 try:
