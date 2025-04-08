@@ -19,10 +19,20 @@ PROJECT_KEY = os.getenv("PROJECT_KEY")
 DEFAULT_DOT_SIZE = 1500
 DOT_SCALING_AMOUNT = 1000
 
+COLOR_PALETTE = "tab20"
+# COLOR_PALETTE = "Set3"
+# COLOR_PALETTE = "Pastel1"
+
+# PLOTTING_ALGORITHM = "kamada-kawai"
+PLOTTING_ALGORITHM = "spring"
+# PLOTTING_ALGORITHM = "fruchterman_reingold"
+# PLOTTING_ALGORITHM = "circular"
+# PLOTTING_ALGORITHM = "planar"
+
 # fetches the issues from Jira
 def fetch_issues(headers):
     jql = f'project = {PROJECT_KEY} AND sprint = {SPRINT_NUMBER} AND Team[Team] = {TEAM_GUID}'
-    url = f"{JIRA_BASE_URL}/rest/api/2/search?jql={jql}&expand=changelog"
+    url = f"{JIRA_BASE_URL}/rest/api/2/search?jql={jql}"
 
     response = requests.get(url, headers=headers)
     response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
@@ -60,7 +70,7 @@ def get_parent_data(chain_graph, issues, headers):
     parent_names = {}
     chain_node_colors = []
     parent_colors = {}
-    color_cycle = plt.cm.get_cmap("Set3", chain_graph.number_of_nodes()).colors
+    color_cycle = plt.cm.get_cmap(COLOR_PALETTE, chain_graph.number_of_nodes()).colors
 
      # Fetch parent info only for issues in blocker chains
     for node in chain_graph.nodes:
@@ -84,6 +94,20 @@ def get_parent_data(chain_graph, issues, headers):
 
     return parent_names, chain_node_colors, parent_colors
 
+def create_plot_points(chain_graph):
+    if PLOTTING_ALGORITHM == 'kamada-kawai':
+        return nx.kamada_kawai_layout(chain_graph)
+    elif PLOTTING_ALGORITHM == 'spring':
+        return nx.spring_layout(chain_graph, k=0.5, iterations=70)
+    elif PLOTTING_ALGORITHM == 'fruchterman_reingold':
+        return nx.fruchterman_reingold_layout(chain_graph, k=.7, iterations=50)
+    elif PLOTTING_ALGORITHM == 'circular':
+        return nx.circular_layout(chain_graph)
+    elif PLOTTING_ALGORITHM == 'planar':
+        return nx.planar_layout(chain_graph)
+    else:
+        raise "Invalid algorithm selection"
+
 def visualize_blocker_chains(headers, issues):   
     graph, issues_in_chains, node_sizes = get_blocker_chains(issues)
 
@@ -95,7 +119,7 @@ def visualize_blocker_chains(headers, issues):
 
     if chain_graph.number_of_nodes() > 0:
         # Create the graph
-        pos = nx.kamada_kawai_layout(chain_graph)
+        pos = create_plot_points(chain_graph)
         nx.draw(chain_graph, pos, with_labels=True, labels=chain_issue_keys, node_color=chain_node_colors, node_size=chain_node_sizes, font_size=8, font_color="black", arrowsize=20)
         plt.title(f"Jira Blocker Chains - Sprint {SPRINT_NUMBER}")
 
