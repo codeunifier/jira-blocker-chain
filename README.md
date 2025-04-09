@@ -2,7 +2,7 @@
 
 ## Environment variables
 
-<code>
+```
 JIRA_API_TOKEN = # generate your api token from Jira and paste it in here
 JIRA_BASE_URL = "https://packback.atlassian.net"
 JIRA_USERNAME = # your email address / jira username
@@ -10,7 +10,7 @@ JIRA_USERNAME = # your email address / jira username
 PROJECT_KEY = # the three-letter code for the project
 TEAM_GUID = # this is a guid that can be pulled from Jira for the team
 SPRINT_NUMBER = # this is a number that can be pulled from Jira for the sprint
-</code>
+```
 
 ## Controls to improve visualization
 
