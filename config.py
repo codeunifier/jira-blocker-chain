@@ -13,9 +13,3 @@ DOT_SCALING_AMOUNT = 1000
 # COLOR_PALETTE = "Pastel1"
 # COLOR_PALETTE = "Set3"
 COLOR_PALETTE = "Set2"
-
-# PLOTTING_ALGORITHM = "kamada-kawai"
-PLOTTING_ALGORITHM = "spring"
-# PLOTTING_ALGORITHM = "fruchterman_reingold"
-# PLOTTING_ALGORITHM = "circular"
-# PLOTTING_ALGORITHM = "planar"
