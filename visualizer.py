@@ -1,11 +1,9 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from config import COLOR_PALETTE
+from config import COLOR_PALETTE, CLUSTER_LAYOUT, NODE_LAYOUT, CLUSTER_K_DIST, NODE_K_DIST
 from jira_client import JiraClient
-
-CLUSTER_LAYOUT = 'spring'
-NODE_LAYOUT = 'circular'
+import math
 
 def create_plot_points(graph: nx.DiGraph, layout_type='spring', k=0.5, iterations=50) -> dict:
     if layout_type == 'kamada-kawai':
@@ -26,36 +24,69 @@ def _identify_clusters(graph: nx.DiGraph, issues: list) -> dict:
     for node in graph.nodes():
         parent_id = next((i["fields"].get("parent", {}).get("key") for i in issues if i["key"] == node), None)
         if parent_id:
-            if parent_id not in clusters:
-                clusters[parent_id] = []
-            clusters[parent_id].append(node)
+            clusters.setdefault(parent_id, []).append(node)
         else:
-            if "orphan" not in clusters:
-                clusters["orphan"] = []
-            clusters["orphan"].append(node)
+            clusters.setdefault("orphan", []).append(node)
     return clusters
 
-def _calculate_node_positions(graph: nx.DiGraph, clusters: dict) -> dict:
+def _create_cluster_graph(clusters: dict) -> nx.Graph:
     cluster_graph = nx.Graph()
     for parent_id in clusters:
         cluster_graph.add_node(parent_id)
-    cluster_pos = create_plot_points(cluster_graph, layout_type=CLUSTER_LAYOUT, k=1.0, iterations=100)
+    return cluster_graph
 
+def _calculate_cluster_positions(cluster_graph: nx.Graph) -> dict:
+    return create_plot_points(cluster_graph, layout_type=CLUSTER_LAYOUT, k=CLUSTER_K_DIST, iterations=100)
+
+def _calculate_sub_node_positions(graph: nx.DiGraph, clusters: dict, cluster_pos: dict) -> dict:
     node_pos = {}
     for parent_id, nodes in clusters.items():
         subgraph = graph.subgraph(nodes)
-        sub_pos = create_plot_points(subgraph, layout_type=NODE_LAYOUT, k=0.5, iterations=100)
-        center_x, center_y = cluster_pos[parent_id]
+        sub_pos = create_plot_points(subgraph, layout_type=NODE_LAYOUT, k=NODE_K_DIST, iterations=50)
         for node, (x, y) in sub_pos.items():
-            node_pos[node] = (x + center_x, y + center_y)
+            node_pos[node] = (x + cluster_pos[parent_id][0], y + cluster_pos[parent_id][1])
     return node_pos
+
+def _calculate_cluster_radii(graph: nx.DiGraph, clusters: dict, cluster_pos: dict, node_pos: dict) -> dict:
+    cluster_radii = {}
+    for parent_id, nodes in clusters.items():
+        max_dist = 0
+        for node in nodes:
+            x, y = node_pos[node]
+            dist = math.sqrt((x - cluster_pos[parent_id][0])**2 + (y - cluster_pos[parent_id][1])**2)
+            max_dist = max(max_dist, dist)
+        cluster_radii[parent_id] = max_dist * 1.2
+    return cluster_radii
+
+def _adjust_cluster_positions(clusters: dict, cluster_pos: dict, cluster_radii: dict) -> dict:
+    adjusted_cluster_pos = cluster_pos.copy()
+    for parent_id1 in clusters:
+        for parent_id2 in clusters:
+            if parent_id1 != parent_id2:
+                x1, y1 = adjusted_cluster_pos[parent_id1]
+                x2, y2 = adjusted_cluster_pos[parent_id2]
+                dist = math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+                min_dist = cluster_radii[parent_id1] + cluster_radii[parent_id2]
+                if dist < min_dist:
+                    dx, dy = x2 - x1, y2 - y1
+                    angle = math.atan2(dy, dx) if dx != 0 or dy != 0 else 0
+                    move_dist = (min_dist - dist) / 2
+                    adjusted_cluster_pos[parent_id1] = (x1 - move_dist * math.cos(angle), y1 - move_dist * math.sin(angle))
+                    adjusted_cluster_pos[parent_id2] = (x2 + move_dist * math.cos(angle), y2 + move_dist * math.sin(angle))
+    return adjusted_cluster_pos
+
+def _apply_adjusted_cluster_positions(clusters: dict, node_pos: dict, adjusted_cluster_pos: dict, cluster_pos: dict) -> dict:
+    adjusted_node_pos = {}
+    for node, (x, y) in node_pos.items():
+        parent_id = next(pid for pid, nodes in clusters.items() if node in nodes)
+        x_diff = adjusted_cluster_pos[parent_id][0] - cluster_pos[parent_id][0]
+        y_diff = adjusted_cluster_pos[parent_id][1] - cluster_pos[parent_id][1]
+        adjusted_node_pos[node] = (x + x_diff, y + y_diff)
+    return adjusted_node_pos
 
 def _calculate_node_colors(graph: nx.DiGraph, issues: list, jira_client: JiraClient) -> tuple[list, dict]:
     color_cycle = plt.cm.get_cmap(COLOR_PALETTE, len(_identify_clusters(graph, issues))).colors
-    node_colors = []
-    parent_colors = {}
-    parent_names = {}
-
+    node_colors, parent_colors, parent_names = [], {}, {}
     for node in graph.nodes():
         parent_id = next((i["fields"].get("parent", {}).get("key") for i in issues if i["key"] == node), None)
         if parent_id:
@@ -67,34 +98,33 @@ def _calculate_node_colors(graph: nx.DiGraph, issues: list, jira_client: JiraCli
             node_colors.append("lightgray")
     return node_colors, parent_colors, parent_names
 
-def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes: dict, sprint_number: str, parent_colors: dict, parent_names:dict, clusters: dict):
+def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes: dict, sprint_number: str, parent_colors: dict, parent_names: dict, clusters: dict):
     nx.draw(graph, node_pos, with_labels=True, labels={k: k for k in graph.nodes()}, node_color=node_colors, node_size=[node_sizes[node] for node in graph.nodes()], font_size=8, font_color="black", arrowsize=20)
     plt.title(f"Jira Blocker Chains - Sprint {sprint_number}")
-
     handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in parent_colors.values()]
     labels = [f"{parent_names.get(key, key)} ({key})" for key in parent_colors]
-    if len(handles) > 0:
+    if handles:
         plt.legend(handles, labels, title="Parent Issues")
-
-    # Add circles around clusters
     for parent_id, nodes in clusters.items():
         cluster_x = [node_pos[node][0] for node in nodes]
         cluster_y = [node_pos[node][1] for node in nodes]
         center_x = sum(cluster_x) / len(cluster_x)
         center_y = sum(cluster_y) / len(cluster_y)
-        radius = max(max(abs(x - center_x), abs(y - center_y)) for x, y in zip(cluster_x, cluster_y)) * 1.2 #add a buffer to the radius.
-
+        radius = max(max(abs(x - center_x), abs(y - center_y)) for x, y in zip(cluster_x, cluster_y)) * 1.2
         circle = patches.Circle((center_x, center_y), radius, fill=False, edgecolor='gray', linestyle='--')
         plt.gca().add_patch(circle)
-
     plt.show()
 
 def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_client: JiraClient, sprint_number: str):
     if graph.number_of_nodes() == 0:
         print("No blocker chains found in the specified sprint.")
         return
-
     clusters = _identify_clusters(graph, issues)
-    node_pos = _calculate_node_positions(graph, clusters)
+    cluster_graph = _create_cluster_graph(clusters)
+    cluster_pos = _calculate_cluster_positions(cluster_graph)
+    node_pos = _calculate_sub_node_positions(graph, clusters, cluster_pos)
+    cluster_radii = _calculate_cluster_radii(graph, clusters, cluster_pos, node_pos)
+    adjusted_cluster_pos = _adjust_cluster_positions(clusters, cluster_pos, cluster_radii)
+    adjusted_node_pos = _apply_adjusted_cluster_positions(clusters, node_pos, adjusted_cluster_pos, cluster_pos)
     node_colors, parent_colors, parent_names = _calculate_node_colors(graph, issues, jira_client)
-    _draw_graph(graph, node_pos, node_colors, node_sizes, sprint_number, parent_colors, parent_names, clusters)
+    _draw_graph(graph, adjusted_node_pos, node_colors, node_sizes, sprint_number, parent_colors, parent_names, clusters)
