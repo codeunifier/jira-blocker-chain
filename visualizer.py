@@ -5,6 +5,7 @@ from config import COLOR_PALETTE, CLUSTER_LAYOUT, NODE_LAYOUT, CLUSTER_K_DIST, N
 from jira_client import JiraClient
 import math
 
+# Creates a dictionary of node positions using various graph layout algorithms
 def create_plot_points(graph: nx.DiGraph, layout_type='spring', k=0.5, iterations=50) -> dict:
     if layout_type == 'kamada-kawai':
         return nx.kamada_kawai_layout(graph)
@@ -19,6 +20,7 @@ def create_plot_points(graph: nx.DiGraph, layout_type='spring', k=0.5, iteration
     else:
         raise ValueError("Invalid plotting algorithm selected.")
 
+# Groups nodes into clusters based on their parent issues
 def _identify_clusters(graph: nx.DiGraph, issues: list) -> dict:
     clusters = {}
     for node in graph.nodes():
@@ -29,15 +31,18 @@ def _identify_clusters(graph: nx.DiGraph, issues: list) -> dict:
             clusters.setdefault("orphan", []).append(node)
     return clusters
 
+# Creates a graph where each node represents a cluster of issues
 def _create_cluster_graph(clusters: dict) -> nx.Graph:
     cluster_graph = nx.Graph()
     for parent_id in clusters:
         cluster_graph.add_node(parent_id)
     return cluster_graph
 
+# Calculates the positions of each cluster in the visualization
 def _calculate_cluster_positions(cluster_graph: nx.Graph) -> dict:
     return create_plot_points(cluster_graph, layout_type=CLUSTER_LAYOUT, k=CLUSTER_K_DIST, iterations=100)
 
+# Calculates the positions of nodes within each cluster
 def _calculate_sub_node_positions(graph: nx.DiGraph, clusters: dict, cluster_pos: dict) -> dict:
     node_pos = {}
     for parent_id, nodes in clusters.items():
@@ -47,6 +52,7 @@ def _calculate_sub_node_positions(graph: nx.DiGraph, clusters: dict, cluster_pos
             node_pos[node] = (x + cluster_pos[parent_id][0], y + cluster_pos[parent_id][1])
     return node_pos
 
+# Determines the radius needed for each cluster based on the positions of nodes within it
 def _calculate_cluster_radii(graph: nx.DiGraph, clusters: dict, cluster_pos: dict, node_pos: dict) -> dict:
     cluster_radii = {}
     for parent_id, nodes in clusters.items():
@@ -58,6 +64,7 @@ def _calculate_cluster_radii(graph: nx.DiGraph, clusters: dict, cluster_pos: dic
         cluster_radii[parent_id] = max_dist * 1.2
     return cluster_radii
 
+# Adjusts cluster positions to prevent overlap between clusters
 def _adjust_cluster_positions(clusters: dict, cluster_pos: dict, cluster_radii: dict) -> dict:
     adjusted_cluster_pos = cluster_pos.copy()
     for parent_id1 in clusters:
@@ -75,6 +82,7 @@ def _adjust_cluster_positions(clusters: dict, cluster_pos: dict, cluster_radii: 
                     adjusted_cluster_pos[parent_id2] = (x2 + move_dist * math.cos(angle), y2 + move_dist * math.sin(angle))
     return adjusted_cluster_pos
 
+# Updates node positions based on the adjusted cluster positions
 def _apply_adjusted_cluster_positions(clusters: dict, node_pos: dict, adjusted_cluster_pos: dict, cluster_pos: dict) -> dict:
     adjusted_node_pos = {}
     for node, (x, y) in node_pos.items():
@@ -84,6 +92,7 @@ def _apply_adjusted_cluster_positions(clusters: dict, node_pos: dict, adjusted_c
         adjusted_node_pos[node] = (x + x_diff, y + y_diff)
     return adjusted_node_pos
 
+# Assigns colors to nodes based on their parent issues
 def _calculate_node_colors(graph: nx.DiGraph, issues: list, jira_client: JiraClient) -> tuple[list, dict]:
     color_cycle = plt.cm.get_cmap(COLOR_PALETTE, len(_identify_clusters(graph, issues))).colors
     node_colors, parent_colors, parent_names = [], {}, {}
@@ -98,6 +107,7 @@ def _calculate_node_colors(graph: nx.DiGraph, issues: list, jira_client: JiraCli
             node_colors.append("lightgray")
     return node_colors, parent_colors, parent_names
 
+# Renders the graph with all visual elements including nodes, edges, clusters, and legend
 def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes: dict, sprint_number: str, parent_colors: dict, parent_names: dict, clusters: dict):
     nx.draw(graph, node_pos, with_labels=True, labels={k: k for k in graph.nodes()}, node_color=node_colors, node_size=[node_sizes[node] for node in graph.nodes()], font_size=8, font_color="black", arrowsize=20)
     plt.title(f"Jira Blocker Chains - Sprint {sprint_number}")
@@ -115,6 +125,7 @@ def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes
         plt.gca().add_patch(circle)
     plt.show()
 
+# Main visualization function that orchestrates the entire graph rendering process
 def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_client: JiraClient, sprint_number: str):
     if graph.number_of_nodes() == 0:
         print("No blocker chains found in the specified sprint.")
