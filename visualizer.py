@@ -47,7 +47,7 @@ def _calculate_sub_node_positions(graph: nx.DiGraph, clusters: dict, cluster_pos
     node_pos = {}
     for parent_id, nodes in clusters.items():
         subgraph = graph.subgraph(nodes)
-        sub_pos = create_plot_points(subgraph, layout_type=NODE_LAYOUT, k=NODE_K_DIST, iterations=50)
+        sub_pos = create_plot_points(subgraph, layout_type=NODE_LAYOUT, k=NODE_K_DIST, iterations=100)
         for node, (x, y) in sub_pos.items():
             node_pos[node] = (x + cluster_pos[parent_id][0], y + cluster_pos[parent_id][1])
     return node_pos

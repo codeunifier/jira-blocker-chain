@@ -16,6 +16,6 @@ COLOR_PALETTE = "Set2"
 # - planar
 ###########################
 CLUSTER_LAYOUT = "circular"
-NODE_LAYOUT = "planar"
+NODE_LAYOUT = "circular"
 CLUSTER_K_DIST = 1
 NODE_K_DIST = 1

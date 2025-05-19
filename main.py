@@ -11,13 +11,13 @@ def main():
 
     try:
         project_key = os.getenv("PROJECT_KEY")
-        sprint_number = os.getenv("SPRINT_NUMBER")
+        sprint_code = os.getenv("SPRINT")
         team_guid = os.getenv("TEAM_GUID")
 
-        issues = jira_client.fetch_issues(project_key, sprint_number, team_guid)
+        issues = jira_client.fetch_issues(project_key, sprint_code, team_guid)
         graph, issues_in_chains, node_sizes = build_blocker_graph(issues)
         chain_graph = graph.subgraph(issues_in_chains)
-        visualize_graph(chain_graph, issues, node_sizes, jira_client, sprint_number)
+        visualize_graph(chain_graph, issues, node_sizes, jira_client, sprint_code)
     except Exception as e:
         print(f"An error occurred: {e}")
 
