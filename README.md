@@ -2,6 +2,10 @@
 
 A tool for visualizing blocker chains in Jira sprints to help prioritize work effectively.
 
+## AI Advisory
+
+A lot of this code was written with the help of Claude. It is certainly not the cleanest / readable code. I will work on improving that as I continue working on this code. I am not the most experienced with highly sophisticated Python code so if you see any glaring issues, please open an Issue or even a Pull Request. It would be greatly appreciated.
+
 ## Setup
 
 1. Create a `.env` file in the project directory with your Jira credentials:
