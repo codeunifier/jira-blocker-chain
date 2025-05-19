@@ -4,6 +4,8 @@ import matplotlib.patches as patches
 from config import COLOR_PALETTE, CLUSTER_LAYOUT, NODE_LAYOUT, CLUSTER_K_DIST, NODE_K_DIST
 from jira_client import JiraClient
 import math
+import os
+import datetime
 
 # Creates a dictionary of node positions using various graph layout algorithms
 def create_plot_points(graph: nx.DiGraph, layout_type='spring', k=0.5, iterations=50) -> dict:
@@ -108,7 +110,8 @@ def _calculate_node_colors(graph: nx.DiGraph, issues: list, jira_client: JiraCli
     return node_colors, parent_colors, parent_names
 
 # Renders the graph with all visual elements including nodes, edges, clusters, and legend
-def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes: dict, sprint_number: str, parent_colors: dict, parent_names: dict, clusters: dict):
+def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes: dict, sprint_number: str, parent_colors: dict, parent_names: dict, clusters: dict, save_path=None):
+    plt.figure(figsize=(12, 10))
     nx.draw(graph, node_pos, with_labels=True, labels={k: k for k in graph.nodes()}, node_color=node_colors, node_size=[node_sizes[node] for node in graph.nodes()], font_size=8, font_color="black", arrowsize=20)
     plt.title(f"Jira Blocker Chains - Sprint {sprint_number}")
     handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in parent_colors.values()]
@@ -123,13 +126,21 @@ def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes
         radius = max(max(abs(x - center_x), abs(y - center_y)) for x, y in zip(cluster_x, cluster_y)) * 1.2
         circle = patches.Circle((center_x, center_y), radius, fill=False, edgecolor='gray', linestyle='--')
         plt.gca().add_patch(circle)
-    plt.show()
+    
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.close()
+        return save_path
+    else:
+        plt.show()
+        return None
 
 # Main visualization function that orchestrates the entire graph rendering process
-def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_client: JiraClient, sprint_number: str):
+def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_client: JiraClient, sprint_number: str, save_file=True):
     if graph.number_of_nodes() == 0:
         print("No blocker chains found in the specified sprint.")
-        return
+        return None
+        
     clusters = _identify_clusters(graph, issues)
     cluster_graph = _create_cluster_graph(clusters)
     cluster_pos = _calculate_cluster_positions(cluster_graph)
@@ -138,4 +149,23 @@ def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_clie
     adjusted_cluster_pos = _adjust_cluster_positions(clusters, cluster_pos, cluster_radii)
     adjusted_node_pos = _apply_adjusted_cluster_positions(clusters, node_pos, adjusted_cluster_pos, cluster_pos)
     node_colors, parent_colors, parent_names = _calculate_node_colors(graph, issues, jira_client)
-    _draw_graph(graph, adjusted_node_pos, node_colors, node_sizes, sprint_number, parent_colors, parent_names, clusters)
+    
+    if save_file:
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"blocker_chain_sprint_{sprint_number}_{timestamp}.png"
+        save_path = os.path.join(output_dir, filename)
+        
+        result = _draw_graph(graph, adjusted_node_pos, node_colors, node_sizes, 
+                           sprint_number, parent_colors, parent_names, clusters, 
+                           save_path=save_path)
+        print(f"Graph saved to: {save_path}")
+        return save_path
+    else:
+        # Just show the graph
+        return _draw_graph(graph, adjusted_node_pos, node_colors, node_sizes, 
+                         sprint_number, parent_colors, parent_names, clusters)

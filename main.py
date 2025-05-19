@@ -3,8 +3,12 @@ from jira_client import JiraClient
 from graph_builder import build_blocker_graph
 from visualizer import visualize_graph
 import os
+import tkinter as tk
+from gui import JiraBlockerChainGUI
 
-def main():
+
+def run_cli_mode():
+    """Run in command-line mode using environment variables"""
     dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
     load_dotenv(dotenv_path=dotenv_path)
     jira_client = JiraClient()
@@ -20,6 +24,25 @@ def main():
         visualize_graph(chain_graph, issues, node_sizes, jira_client, sprint_code)
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+def main():
+    """Main entry point with support for GUI and CLI modes"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Jira Blocker Chain Tool')
+    parser.add_argument('--cli', action='store_true', help='Run in command-line mode')
+    args = parser.parse_args()
+    
+    if args.cli:
+        # Run in CLI mode
+        run_cli_mode()
+    else:
+        # Run in GUI mode
+        root = tk.Tk()
+        app = JiraBlockerChainGUI(root)
+        root.mainloop()
+
 
 if __name__ == "__main__":
     main()

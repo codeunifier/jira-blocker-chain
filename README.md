@@ -1,16 +1,61 @@
 # Jira Blocker Chains
 
-## Environment variables
+A tool for visualizing blocker chains in Jira sprints to help prioritize work effectively.
+
+## Setup
+
+1. Create a `.env` file in the project directory with your Jira credentials:
 
 ```
 JIRA_API_TOKEN = # generate your api token from Jira and paste it in here
 JIRA_BASE_URL = "https://packback.atlassian.net"
 JIRA_USERNAME = # your email address / jira username
 
-PROJECT_KEY = # the three-letter code for the project
-TEAM_GUID = # this is a guid that can be pulled from Jira for the team
-SPRINT_NUMBER = # this is a number that can be pulled from Jira for the sprint
+# Default values (optional - can be set in GUI)
+PROJECT_KEY = "ENG"
+TEAM_GUID = "cea040b4-0710-4359-b46d-f9b64c27ef36" # Armadillo
+# TEAM_GUID = "a4bb26c1-324e-4218-9120-feda39ca1279" # Backpack
+SPRINT = "K07"
 ```
+
+2. Install the required dependencies:
+
+```
+pip install -r requirements.txt
+```
+
+## Usage
+
+The application can be run in two modes:
+
+### GUI Mode (Recommended)
+
+Simply run the script without any arguments:
+
+```
+python main.py
+```
+
+This will open a graphical interface where you can:
+
+1. Select your team (Armadillo or Backpack) from the dropdown
+2. Configure project key and sprint
+3. Generate the blocker chain graph with a single click
+
+**Important:**
+- Jira credentials (API token, username, base URL) must be configured in the `.env` file
+- The GUI does not modify the `.env` file; it only reads default values from it
+- Any changes to settings in the GUI are used only for the current session
+
+### CLI Mode
+
+For automation or scripting, you can run in command-line mode using:
+
+```
+python main.py --cli
+```
+
+In CLI mode, the application reads all configuration from the `.env` file, including project key, team GUID, and sprint.
 
 ## Glossary
 
@@ -18,7 +63,7 @@ SPRINT_NUMBER = # this is a number that can be pulled from Jira for the sprint
     <li>
         <strong>Cluster</strong> - a graph element synonymous with an Epic. Clusters can be arranged in a separate layout than the nodes, which may produce a better visual. I have plans to update the behavior to consider a blocker chain a cluster, which I think will produce much better results.
     </li>
-    <li><strong>Node</strong> - a graph elemnent synonymous with a ticket.</li>
+    <li><strong>Node</strong> - a graph element synonymous with a ticket.</li>
     <li><strong>Edge</strong> - a graph element indicating a ticket blocking another ticket</li>
 </ul>
 
