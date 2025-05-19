@@ -100,7 +100,7 @@ class JiraBlockerChainGUI:
             self.sprint.insert(0, self.env_vars["SPRINT"])
         
         # Add sprint help text
-        sprint_help = "Comma-separated list of sprint codes (e.g. 'K06,K07,K08')"
+        sprint_help = "Comma-separated list of sprint codes (e.g. 'J07,K07,L07')"
         ttk.Label(project_frame, text=sprint_help, foreground="gray", font=('Arial', 8)).grid(column=1, row=3, sticky=tk.W)
         
         # Button frame
