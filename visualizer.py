@@ -42,14 +42,14 @@ def _create_cluster_graph(clusters: dict) -> nx.Graph:
 
 # Calculates the positions of each cluster in the visualization
 def _calculate_cluster_positions(cluster_graph: nx.Graph) -> dict:
-    return create_plot_points(cluster_graph, layout_type=CLUSTER_LAYOUT, k=CLUSTER_K_DIST, iterations=100)
+    return create_plot_points(cluster_graph, layout_type=CLUSTER_LAYOUT, k=CLUSTER_K_DIST, iterations=150)
 
 # Calculates the positions of nodes within each cluster
 def _calculate_sub_node_positions(graph: nx.DiGraph, clusters: dict, cluster_pos: dict) -> dict:
     node_pos = {}
     for parent_id, nodes in clusters.items():
         subgraph = graph.subgraph(nodes)
-        sub_pos = create_plot_points(subgraph, layout_type=NODE_LAYOUT, k=NODE_K_DIST, iterations=100)
+        sub_pos = create_plot_points(subgraph, layout_type=NODE_LAYOUT, k=NODE_K_DIST, iterations=150)
         for node, (x, y) in sub_pos.items():
             node_pos[node] = (x + cluster_pos[parent_id][0], y + cluster_pos[parent_id][1])
     return node_pos
@@ -109,11 +109,30 @@ def _calculate_node_colors(graph: nx.DiGraph, issues: list, jira_client: JiraCli
             node_colors.append("lightgray")
     return node_colors, parent_colors, parent_names
 
+# Format sprint codes for display in title
+def _format_sprint_title(sprint_codes: str) -> str:
+    """Format sprint codes for display in the graph title"""
+    if ',' in sprint_codes:
+        # For multiple sprints, use "Sprints X, Y, Z"
+        sprint_parts = [part.strip() for part in sprint_codes.split(',') if part.strip()]
+        return f"Sprints {', '.join(sprint_parts)}"
+    else:
+        # For a single sprint, use "Sprint X"
+        return f"Sprint {sprint_codes.strip()}"
+
 # Renders the graph with all visual elements including nodes, edges, clusters, and legend
-def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes: dict, sprint_number: str, parent_colors: dict, parent_names: dict, clusters: dict, save_path=None):
+def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes: dict, 
+               sprint_codes: str, parent_colors: dict, parent_names: dict, clusters: dict, 
+               save_path=None):
     plt.figure(figsize=(12, 10))
-    nx.draw(graph, node_pos, with_labels=True, labels={k: k for k in graph.nodes()}, node_color=node_colors, node_size=[node_sizes[node] for node in graph.nodes()], font_size=8, font_color="black", arrowsize=20)
-    plt.title(f"Jira Blocker Chains - Sprint {sprint_number}")
+    nx.draw(graph, node_pos, with_labels=True, labels={k: k for k in graph.nodes()}, 
+           node_color=node_colors, node_size=[node_sizes[node] for node in graph.nodes()], 
+           font_size=8, font_color="black", arrowsize=20)
+    
+    # Format the sprint title based on whether there are multiple sprints
+    sprint_title = _format_sprint_title(sprint_codes)
+    plt.title(f"Jira Blocker Chains - {sprint_title}")
+    
     handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in parent_colors.values()]
     labels = [f"{parent_names.get(key, key)} ({key})" for key in parent_colors]
     if handles:
@@ -136,9 +155,9 @@ def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes
         return None
 
 # Main visualization function that orchestrates the entire graph rendering process
-def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_client: JiraClient, sprint_number: str, save_file=True):
+def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_client: JiraClient, sprint_codes: str, save_file=True):
     if graph.number_of_nodes() == 0:
-        print("No blocker chains found in the specified sprint.")
+        print("No blocker chains found in the specified sprints.")
         return None
         
     clusters = _identify_clusters(graph, issues)
@@ -157,15 +176,18 @@ def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_clie
         
         # Generate filename with timestamp
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"blocker_chain_sprint_{sprint_number}_{timestamp}.png"
+        
+        # Use a simplified version of sprint codes for the filename
+        sprint_filename = sprint_codes.replace(',', '_').replace(' ', '')
+        filename = f"blocker_chain_{sprint_filename}_{timestamp}.png"
         save_path = os.path.join(output_dir, filename)
         
         result = _draw_graph(graph, adjusted_node_pos, node_colors, node_sizes, 
-                           sprint_number, parent_colors, parent_names, clusters, 
+                           sprint_codes, parent_colors, parent_names, clusters, 
                            save_path=save_path)
         print(f"Graph saved to: {save_path}")
         return save_path
     else:
         # Just show the graph
         return _draw_graph(graph, adjusted_node_pos, node_colors, node_sizes, 
-                         sprint_number, parent_colors, parent_names, clusters)
+                         sprint_codes, parent_colors, parent_names, clusters)

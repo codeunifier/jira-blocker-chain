@@ -15,13 +15,13 @@ def run_cli_mode():
 
     try:
         project_key = os.getenv("PROJECT_KEY")
-        sprint_code = os.getenv("SPRINT")
+        sprint_codes = os.getenv("SPRINT")
         team_guid = os.getenv("TEAM_GUID")
 
-        issues = jira_client.fetch_issues(project_key, sprint_code, team_guid)
+        issues = jira_client.fetch_issues(project_key, sprint_codes, team_guid)
         graph, issues_in_chains, node_sizes = build_blocker_graph(issues)
         chain_graph = graph.subgraph(issues_in_chains)
-        visualize_graph(chain_graph, issues, node_sizes, jira_client, sprint_code, save_file=False)
+        visualize_graph(chain_graph, issues, node_sizes, jira_client, sprint_codes, save_file=False)
     except Exception as e:
         print(f"An error occurred: {e}")
 

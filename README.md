@@ -15,7 +15,7 @@ JIRA_USERNAME = # your email address / jira username
 PROJECT_KEY = "ENG"
 TEAM_GUID = "cea040b4-0710-4359-b46d-f9b64c27ef36" # Armadillo
 # TEAM_GUID = "a4bb26c1-324e-4218-9120-feda39ca1279" # Backpack
-SPRINT = "K07"
+SPRINT = "K07,K08" # Comma-separated list of sprint codes
 ```
 
 2. Install the required dependencies:
@@ -39,8 +39,13 @@ python main.py
 This will open a graphical interface where you can:
 
 1. Select your team (Armadillo or Backpack) from the dropdown
-2. Configure project key and sprint
+2. Configure project key and sprint(s)
 3. Generate the blocker chain graph with a single click
+
+**Sprint Configuration:**
+- You can specify multiple sprints by entering a comma-separated list (e.g., `K06,K07,K08`)
+- The tool will fetch tickets from all specified sprints and combine them in a single graph
+- This is useful for seeing blocker chains that span across multiple sprints
 
 **Important:**
 - Jira credentials (API token, username, base URL) must be configured in the `.env` file
@@ -55,7 +60,11 @@ For automation or scripting, you can run in command-line mode using:
 python main.py --cli
 ```
 
-In CLI mode, the application reads all configuration from the `.env` file, including project key, team GUID, and sprint.
+In CLI mode, the application reads all configuration from the `.env` file, including project key, team GUID, and sprint(s).
+
+## Graph Output
+
+When running in GUI mode, the generated graph is saved as a PNG file in the `output` directory with a timestamp. The filename includes the sprint codes and timestamp to make it easy to identify different graph iterations.
 
 ## Glossary
 

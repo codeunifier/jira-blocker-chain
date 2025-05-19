@@ -48,7 +48,7 @@ class JiraBlockerChainGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Jira Blocker Chain")
-        self.root.geometry("500x320")
+        self.root.geometry("500x350")
         
         self.env_vars = self.load_env_variables()
         
@@ -93,11 +93,15 @@ class JiraBlockerChainGUI:
         elif len(self.team_options) > 0:
             self.team_var.set(list(self.team_options.keys())[0])
             
-        ttk.Label(project_frame, text="Sprint:").grid(column=0, row=2, sticky=tk.W, pady=5)
+        ttk.Label(project_frame, text="Sprints:").grid(column=0, row=2, sticky=tk.W, pady=5)
         self.sprint = ttk.Entry(project_frame, width=40)
         self.sprint.grid(column=1, row=2, sticky=tk.W)
         if "SPRINT" in self.env_vars:
             self.sprint.insert(0, self.env_vars["SPRINT"])
+        
+        # Add sprint help text
+        sprint_help = "Comma-separated list of sprint codes (e.g. 'K06,K07,K08')"
+        ttk.Label(project_frame, text=sprint_help, foreground="gray", font=('Arial', 8)).grid(column=1, row=3, sticky=tk.W)
         
         # Button frame
         button_frame = ttk.Frame(main_frame)
@@ -130,7 +134,7 @@ class JiraBlockerChainGUI:
         project_key = self.project_key.get().strip()
         team_name = self.team_var.get()
         team_guid = self.team_options.get(team_name, "")
-        sprint_code = self.sprint.get().strip()
+        sprint_codes = self.sprint.get().strip()
         
         if not project_key:
             messagebox.showerror("Error", "Project Key is required!")
@@ -138,8 +142,8 @@ class JiraBlockerChainGUI:
         if not team_guid:
             messagebox.showerror("Error", "Team selection is required!")
             return
-        if not sprint_code:
-            messagebox.showerror("Error", "Sprint is required!")
+        if not sprint_codes:
+            messagebox.showerror("Error", "At least one Sprint code is required!")
             return
         
         # Make sure Jira credentials exist in environment
@@ -151,7 +155,7 @@ class JiraBlockerChainGUI:
         # Start the processing in a separate thread with a loading window
         thread = threading.Thread(
             target=self.generate_graph_thread,
-            args=(project_key, team_guid, sprint_code),
+            args=(project_key, team_guid, sprint_codes),
             daemon=True
         )
         
@@ -162,7 +166,7 @@ class JiraBlockerChainGUI:
         
         thread.start()
     
-    def generate_graph_thread(self, project_key, team_guid, sprint_code):
+    def generate_graph_thread(self, project_key, team_guid, sprint_codes):
         """Generate the graph in a background thread to keep UI responsive"""
         result = None
         error = None
@@ -172,12 +176,12 @@ class JiraBlockerChainGUI:
             jira_client = JiraClient()
             
             # Generate graph using form values directly (not from environment)
-            issues = jira_client.fetch_issues(project_key, sprint_code, team_guid)
+            issues = jira_client.fetch_issues(project_key, sprint_codes, team_guid)
             graph, issues_in_chains, node_sizes = build_blocker_graph(issues)
             chain_graph = graph.subgraph(issues_in_chains)
             
             # Save the graph to a file
-            saved_file = visualize_graph(chain_graph, issues, node_sizes, jira_client, sprint_code, save_file=True)
+            saved_file = visualize_graph(chain_graph, issues, node_sizes, jira_client, sprint_codes, save_file=True)
             result = saved_file
             
         except Exception as e:
@@ -198,4 +202,4 @@ class JiraBlockerChainGUI:
         elif result:
             messagebox.showinfo("Success", f"Graph generated and saved to:\n\n{result}")
         else:
-            messagebox.showinfo("Information", "No blocker chains found in the specified sprint.")
+            messagebox.showinfo("Information", "No blocker chains found in the specified sprints.")
