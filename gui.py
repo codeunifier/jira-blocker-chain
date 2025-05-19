@@ -56,7 +56,9 @@ class JiraBlockerChainGUI:
         # Team GUIDs for dropdown
         self.team_options = {
             "Armadillo": "cea040b4-0710-4359-b46d-f9b64c27ef36",
-            "Backpack": "a4bb26c1-324e-4218-9120-feda39ca1279"
+            "Backpack": "a4bb26c1-324e-4218-9120-feda39ca1279",
+            "AI": "34fdd1e2-222f-4962-9413-522537118a1a",
+            "Data": "9acb7f88-e87e-4c61-8e8a-65cdf8e00e88"
         }
         
         # Layout options
