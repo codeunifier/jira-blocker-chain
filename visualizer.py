@@ -41,15 +41,16 @@ def _create_cluster_graph(clusters: dict) -> nx.Graph:
     return cluster_graph
 
 # Calculates the positions of each cluster in the visualization
-def _calculate_cluster_positions(cluster_graph: nx.Graph) -> dict:
-    return create_plot_points(cluster_graph, layout_type=CLUSTER_LAYOUT, k=CLUSTER_K_DIST, iterations=150)
+def _calculate_cluster_positions(cluster_graph: nx.Graph, layout_type=CLUSTER_LAYOUT, k_dist=CLUSTER_K_DIST) -> dict:
+    return create_plot_points(cluster_graph, layout_type=layout_type, k=k_dist, iterations=150)
 
 # Calculates the positions of nodes within each cluster
-def _calculate_sub_node_positions(graph: nx.DiGraph, clusters: dict, cluster_pos: dict) -> dict:
+def _calculate_sub_node_positions(graph: nx.DiGraph, clusters: dict, cluster_pos: dict, 
+                                 layout_type=NODE_LAYOUT, k_dist=NODE_K_DIST) -> dict:
     node_pos = {}
     for parent_id, nodes in clusters.items():
         subgraph = graph.subgraph(nodes)
-        sub_pos = create_plot_points(subgraph, layout_type=NODE_LAYOUT, k=NODE_K_DIST, iterations=150)
+        sub_pos = create_plot_points(subgraph, layout_type=layout_type, k=k_dist, iterations=150)
         for node, (x, y) in sub_pos.items():
             node_pos[node] = (x + cluster_pos[parent_id][0], y + cluster_pos[parent_id][1])
     return node_pos
@@ -155,15 +156,51 @@ def _draw_graph(graph: nx.DiGraph, node_pos: dict, node_colors: list, node_sizes
         return None
 
 # Main visualization function that orchestrates the entire graph rendering process
-def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_client: JiraClient, sprint_codes: str, save_file=True):
+def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_client: JiraClient, 
+                   sprint_codes: str, save_file=True, layout_settings=None):
+    """
+    Generate and visualize a graph of Jira blocker chains.
+    
+    Args:
+        graph: NetworkX DiGraph of blocker relationships
+        issues: List of Jira issues
+        node_sizes: Dictionary of node sizes
+        jira_client: JiraClient instance
+        sprint_codes: Sprint code(s) as a string (comma-separated if multiple)
+        save_file: Whether to save the graph to a file (True) or display it (False)
+        layout_settings: Optional dictionary with custom layout settings:
+            - cluster_layout: Layout algorithm for clusters
+            - node_layout: Layout algorithm for nodes within clusters
+            - cluster_k: K distance parameter for cluster layout
+            - node_k: K distance parameter for node layout
+            
+    Returns:
+        Path to the saved file or None if displayed
+    """
     if graph.number_of_nodes() == 0:
         print("No blocker chains found in the specified sprints.")
         return None
+    
+    # Get layout settings
+    cluster_layout = CLUSTER_LAYOUT
+    node_layout = NODE_LAYOUT
+    cluster_k = CLUSTER_K_DIST
+    node_k = NODE_K_DIST
+    
+    if layout_settings:
+        # Override defaults with custom settings if provided
+        cluster_layout = layout_settings.get('cluster_layout', CLUSTER_LAYOUT)
+        node_layout = layout_settings.get('node_layout', NODE_LAYOUT)
+        cluster_k = layout_settings.get('cluster_k', CLUSTER_K_DIST)
+        node_k = layout_settings.get('node_k', NODE_K_DIST)
+    
+    # Log the layout settings being used
+    print(f"Using layout settings - Cluster: {cluster_layout} (k={cluster_k}), Node: {node_layout} (k={node_k})")
         
     clusters = _identify_clusters(graph, issues)
     cluster_graph = _create_cluster_graph(clusters)
-    cluster_pos = _calculate_cluster_positions(cluster_graph)
-    node_pos = _calculate_sub_node_positions(graph, clusters, cluster_pos)
+    cluster_pos = _calculate_cluster_positions(cluster_graph, layout_type=cluster_layout, k_dist=cluster_k)
+    node_pos = _calculate_sub_node_positions(graph, clusters, cluster_pos, layout_type=node_layout, k_dist=node_k)
     cluster_radii = _calculate_cluster_radii(graph, clusters, cluster_pos, node_pos)
     adjusted_cluster_pos = _adjust_cluster_positions(clusters, cluster_pos, cluster_radii)
     adjusted_node_pos = _apply_adjusted_cluster_positions(clusters, node_pos, adjusted_cluster_pos, cluster_pos)
@@ -174,12 +211,13 @@ def visualize_graph(graph: nx.DiGraph, issues: list, node_sizes: dict, jira_clie
         output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
         os.makedirs(output_dir, exist_ok=True)
         
-        # Generate filename with timestamp
+        # Generate filename with timestamp and layout info
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Use a simplified version of sprint codes for the filename
         sprint_filename = sprint_codes.replace(',', '_').replace(' ', '')
-        filename = f"blocker_chain_{sprint_filename}_{timestamp}.png"
+        layout_info = f"{cluster_layout}_{node_layout}"
+        filename = f"blocker_chain_{sprint_filename}_{layout_info}_{timestamp}.png"
         save_path = os.path.join(output_dir, filename)
         
         result = _draw_graph(graph, adjusted_node_pos, node_colors, node_sizes, 

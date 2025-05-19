@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from jira_client import JiraClient
 from graph_builder import build_blocker_graph
 from visualizer import visualize_graph
+from config import CLUSTER_LAYOUT, NODE_LAYOUT, CLUSTER_K_DIST, NODE_K_DIST
 
 class LoadingWindow:
     def __init__(self, parent, message="Loading..."):
@@ -48,7 +49,7 @@ class JiraBlockerChainGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Jira Blocker Chain")
-        self.root.geometry("500x350")
+        self.root.geometry("500x480")
         
         self.env_vars = self.load_env_variables()
         
@@ -57,6 +58,15 @@ class JiraBlockerChainGUI:
             "Armadillo": "cea040b4-0710-4359-b46d-f9b64c27ef36",
             "Backpack": "a4bb26c1-324e-4218-9120-feda39ca1279"
         }
+        
+        # Layout options
+        self.layout_options = [
+            "kamada-kawai", 
+            "spring", 
+            "fruchterman_reingold", 
+            "circular", 
+            "planar"
+        ]
         
         # Create main frame
         main_frame = ttk.Frame(root, padding=20)
@@ -103,6 +113,58 @@ class JiraBlockerChainGUI:
         sprint_help = "Comma-separated list of sprint codes (e.g. 'J07,K07,L07')"
         ttk.Label(project_frame, text=sprint_help, foreground="gray", font=('Arial', 8)).grid(column=1, row=3, sticky=tk.W)
         
+        # Visualization Settings Frame
+        viz_frame = ttk.LabelFrame(main_frame, text="Visualization Settings", padding=10)
+        viz_frame.pack(fill=tk.X, pady=10)
+        
+        # Cluster Layout
+        ttk.Label(viz_frame, text="Cluster Layout:").grid(column=0, row=0, sticky=tk.W, pady=5)
+        self.cluster_layout_var = tk.StringVar(value=CLUSTER_LAYOUT)
+        self.cluster_layout_combo = ttk.Combobox(viz_frame, 
+                                               textvariable=self.cluster_layout_var,
+                                               values=self.layout_options,
+                                               width=18,
+                                               state="readonly")
+        self.cluster_layout_combo.grid(column=1, row=0, sticky=tk.W)
+        
+        # Node Layout
+        ttk.Label(viz_frame, text="Node Layout:").grid(column=0, row=1, sticky=tk.W, pady=5)
+        self.node_layout_var = tk.StringVar(value=NODE_LAYOUT)
+        self.node_layout_combo = ttk.Combobox(viz_frame, 
+                                            textvariable=self.node_layout_var,
+                                            values=self.layout_options,
+                                            width=18,
+                                            state="readonly")
+        self.node_layout_combo.grid(column=1, row=1, sticky=tk.W)
+        
+        # Cluster K Distance
+        ttk.Label(viz_frame, text="Cluster K Distance:").grid(column=0, row=2, sticky=tk.W, pady=5)
+        self.cluster_k_var = tk.DoubleVar(value=CLUSTER_K_DIST)
+        self.cluster_k_scale = ttk.Scale(viz_frame, from_=0.1, to=2.0, orient=tk.HORIZONTAL, 
+                                       variable=self.cluster_k_var, length=150)
+        self.cluster_k_scale.grid(column=1, row=2, sticky=tk.W)
+        
+        # Add value label for Cluster K
+        self.cluster_k_label = ttk.Label(viz_frame, text=f"{CLUSTER_K_DIST:.1f}")
+        self.cluster_k_label.grid(column=2, row=2, sticky=tk.W, padx=10)
+        self.cluster_k_scale.config(command=lambda x: self.update_k_label('cluster', x))
+        
+        # Node K Distance
+        ttk.Label(viz_frame, text="Node K Distance:").grid(column=0, row=3, sticky=tk.W, pady=5)
+        self.node_k_var = tk.DoubleVar(value=NODE_K_DIST)
+        self.node_k_scale = ttk.Scale(viz_frame, from_=0.1, to=2.0, orient=tk.HORIZONTAL, 
+                                    variable=self.node_k_var, length=150)
+        self.node_k_scale.grid(column=1, row=3, sticky=tk.W)
+        
+        # Add value label for Node K
+        self.node_k_label = ttk.Label(viz_frame, text=f"{NODE_K_DIST:.1f}")
+        self.node_k_label.grid(column=2, row=3, sticky=tk.W, padx=10)
+        self.node_k_scale.config(command=lambda x: self.update_k_label('node', x))
+        
+        # Add layout help text
+        layout_help = "Different layouts work better for different graphs. Try various combinations."
+        ttk.Label(viz_frame, text=layout_help, foreground="gray", font=('Arial', 8)).grid(column=0, row=4, columnspan=3, sticky=tk.W)
+        
         # Button frame
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=20)
@@ -113,6 +175,14 @@ class JiraBlockerChainGUI:
         # Add help text
         help_text = "Note: Jira credentials must be configured in the .env file."
         ttk.Label(main_frame, text=help_text, foreground="gray").pack(side=tk.BOTTOM, pady=10)
+    
+    def update_k_label(self, k_type, value):
+        """Update the value label for K distance sliders"""
+        value = float(value)
+        if k_type == 'cluster':
+            self.cluster_k_label.config(text=f"{value:.1f}")
+        else:
+            self.node_k_label.config(text=f"{value:.1f}")
     
     def load_env_variables(self):
         """Load environment variables from .env file"""
@@ -152,10 +222,18 @@ class JiraBlockerChainGUI:
                 messagebox.showerror("Error", f"{key} is missing from .env file! Please add it manually.")
                 return
         
+        # Get layout settings
+        layout_settings = {
+            'cluster_layout': self.cluster_layout_var.get(),
+            'node_layout': self.node_layout_var.get(),
+            'cluster_k': self.cluster_k_var.get(),
+            'node_k': self.node_k_var.get()
+        }
+        
         # Start the processing in a separate thread with a loading window
         thread = threading.Thread(
             target=self.generate_graph_thread,
-            args=(project_key, team_guid, sprint_codes),
+            args=(project_key, team_guid, sprint_codes, layout_settings),
             daemon=True
         )
         
@@ -166,7 +244,7 @@ class JiraBlockerChainGUI:
         
         thread.start()
     
-    def generate_graph_thread(self, project_key, team_guid, sprint_codes):
+    def generate_graph_thread(self, project_key, team_guid, sprint_codes, layout_settings):
         """Generate the graph in a background thread to keep UI responsive"""
         result = None
         error = None
@@ -180,8 +258,11 @@ class JiraBlockerChainGUI:
             graph, issues_in_chains, node_sizes = build_blocker_graph(issues)
             chain_graph = graph.subgraph(issues_in_chains)
             
-            # Save the graph to a file
-            saved_file = visualize_graph(chain_graph, issues, node_sizes, jira_client, sprint_codes, save_file=True)
+            # Save the graph to a file with custom layout settings
+            saved_file = visualize_graph(
+                chain_graph, issues, node_sizes, jira_client, sprint_codes, 
+                save_file=True, layout_settings=layout_settings
+            )
             result = saved_file
             
         except Exception as e:
@@ -200,6 +281,6 @@ class JiraBlockerChainGUI:
         if error:
             messagebox.showerror("Error", f"An error occurred: {error}")
         elif result:
-            messagebox.showinfo("Success", f"Graph generated and saved to the output folder.\n\nIf finer control over the final image is needed, consider running this script with the '--cli' flag.\n\n{result}")
+            messagebox.showinfo("Success", f"Graph generated and saved to:\n\n{result}")
         else:
             messagebox.showinfo("Information", "No blocker chains found in the specified sprints.")
