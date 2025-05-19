@@ -200,6 +200,6 @@ class JiraBlockerChainGUI:
         if error:
             messagebox.showerror("Error", f"An error occurred: {error}")
         elif result:
-            messagebox.showinfo("Success", f"Graph generated and saved to:\n\n{result}")
+            messagebox.showinfo("Success", f"Graph generated and saved to the output folder.\n\nIf finer control over the final image is needed, consider running this script with the '--cli' flag.\n\n{result}")
         else:
             messagebox.showinfo("Information", "No blocker chains found in the specified sprints.")
