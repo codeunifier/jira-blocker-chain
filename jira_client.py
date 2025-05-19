@@ -19,7 +19,7 @@ class JiraClient:
         }
 
     def fetch_issues(self, project_key: str, sprint_number: str, team_guid: str) -> list:
-        jql = f'project = {project_key} AND sprint = {sprint_number} AND Team[Team] = {team_guid}'
+        jql = f'project = {project_key} AND sprint = {sprint_number} AND Team[Team] = {team_guid} AND status != DONE'
         url = f"{self.jira_base_url}/rest/api/2/search?jql={jql}"
 
         try:
