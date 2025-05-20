@@ -1,7 +1,11 @@
+import typing
+
 import networkx as nx
+
 from config import DEFAULT_DOT_SIZE, DOT_SCALING_AMOUNT
 
-def build_blocker_graph(issues: list) -> tuple[nx.DiGraph, set, dict]:
+
+def build_blocker_graph(issues: list) -> typing.Tuple[nx.DiGraph, set, dict]:
     graph = nx.DiGraph()
     issues_in_chains = set()
     node_sizes = {}
