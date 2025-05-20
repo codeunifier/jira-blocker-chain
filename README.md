@@ -17,9 +17,8 @@ JIRA_USERNAME = # your email address / jira username
 
 # Default values (optional - can be set in GUI)
 PROJECT_KEY = "ENG"
-TEAM_GUID = "cea040b4-0710-4359-b46d-f9b64c27ef36" # Armadillo
-# TEAM_GUID = "a4bb26c1-324e-4218-9120-feda39ca1279" # Backpack
-SPRINT = "J07,K07,L07" # Comma-separated list of sprint codes
+TEAM_GUID = "cea040b4-0710-4359-b46d-f9b64c27ef36"
+SPRINT = "J07,K07,L07"
 ```
 
 2. Install the required dependencies:
