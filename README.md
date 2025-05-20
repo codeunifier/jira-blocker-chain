@@ -27,6 +27,14 @@ SPRINT = "J07,K07,L07"
 pip install -r requirements.txt
 ```
 
+3. Alternatively, you can install the package in development mode:
+
+```
+pip install -e .
+```
+
+This will make the package installable and create a command-line entry point.
+
 ## Usage
 
 The application can be run in two modes:
